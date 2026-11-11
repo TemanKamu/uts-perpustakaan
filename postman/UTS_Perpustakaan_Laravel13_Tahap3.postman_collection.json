@@ -1,0 +1,945 @@
+{
+  "info": {
+    "name": "UTS Perpustakaan Laravel 13 — API Tahap 3",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "# API Perpustakaan — Tahap 3\n\nController dan route kategori/buku sudah diimplementasikan pada paket Tahap 3.\n\n1. Jalankan migration dan php artisan serve.\n2. Import collection ini; pilih No environment.\n3. base_url=http://127.0.0.1:8000 (tanpa /api atau slash akhir).\n4. Run seluruh collection dengan urutan tersimpan dan 1 iteration.\n\n20 request: status aplikasi, health, CRUD kategori/buku, validasi, konflik FK, dan cleanup. enable_crud=true secara default.\n\nData uji memakai nama unik dan ID dari respons create. Jangan mengisi ID data asli. Jika run dihentikan sebelum cleanup, data uji dapat tertinggal. Menjalankan create baru mereset ID tersimpan, bukan menghapus record run terdahulu.\n\nRespons sukses: message + data (array untuk daftar, objek untuk detail/create/update). DELETE: 200 + message. Validasi: 422 + message + errors. ID tidak ditemukan: 404. Kategori dipakai: 409.\n\nFile lama dari Tahap 2 tetap bisa digunakan dengan enable_crud=true, tetapi nama folder dan deskripsinya masih menyebut rancangan.\n"
+  },
+  "auth": {
+    "type": "noauth"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000",
+      "type": "string",
+      "description": "Tanpa /api atau slash akhir."
+    },
+    {
+      "key": "enable_crud",
+      "value": "true",
+      "type": "string",
+      "description": "true untuk menjalankan CRUD; false untuk hanya memeriksa status aplikasi."
+    },
+    {
+      "key": "id_kategori",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "id_buku",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "run_tag",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 — Status aplikasi",
+      "description": "GET / dan /up: HTTP 200. Koneksi database diperiksa lewat request CRUD.",
+      "item": [
+        {
+          "name": "01 — Status aplikasi",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/",
+            "description": "Sudah tersedia pada paket Tahap 3. HTTP 200 dan project UTS Perpustakaan. Tidak membuktikan koneksi database."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP sesuai\", function () { pm.expect(pm.response.code).to.be.oneOf([200]); });",
+                  "pm.test(\"Respons JSON valid\", function () { pm.response.json(); });",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "    const body = pm.response.json();",
+                  "    const data = body.data || body;",
+                  "    pm.test(\"Nilai resource sesuai\", function () { pm.expect(data.project).to.eql(\"UTS Perpustakaan\"); });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "02 — Health Laravel",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/up",
+            "description": "Sudah tersedia pada paket Tahap 3. Laravel mengembalikan health page; HTML diperbolehkan. Tidak menguji tabel kategori/buku."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP sesuai\", function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "02 — CRUD, validasi, dan cleanup",
+      "description": "Sudah diimplementasikan pada Tahap 3. Jalankan berurutan untuk memakai ID hasil create dan menghapus data uji di akhir.",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (String(pm.collectionVariables.get(\"enable_crud\")) !== \"true\") {",
+              "    console.warn(\"CRUD dinonaktifkan. Set enable_crud=true untuk menjalankan alur pengujian.\");",
+              "    pm.execution.skipRequest();",
+              "} else {",
+              "    // Gunakan ID hasil create collection ini, bukan ID dari environment lain.",
+              "    [\"id_kategori\", \"id_buku\", \"run_tag\"].forEach(key => {",
+              "        pm.variables.set(key, pm.collectionVariables.get(key) || \"\");",
+              "    });",
+              "}"
+            ]
+          }
+        }
+      ],
+      "item": [
+        {
+          "name": "01 — Buat kategori uji",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/kategori",
+            "description": "Awal alur. Membuat kategori unik dan menyimpan id_kategori hasil POST. ID contoh dari seeder tidak digunakan.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nama_kategori\": \"Postman {{run_tag}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"run_tag\", Date.now().toString() + \"-\" + Math.random().toString(36).slice(2, 8));",
+                  "pm.collectionVariables.set(\"id_kategori\", \"\");",
+                  "pm.collectionVariables.set(\"id_buku\", \"\");",
+                  "pm.variables.set(\"run_tag\", pm.collectionVariables.get(\"run_tag\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP sesuai\", function () { pm.expect(pm.response.code).to.be.oneOf([201]); });",
+                  "pm.test(\"Respons JSON valid\", function () { pm.response.json(); });",
+                  "if (pm.response.code === 201) {",
+                  "    const body = pm.response.json();",
+                  "    const data = body.data || body;",
+                  "    pm.test(\"ID hasil create tersedia\", function () {",
+                  "        pm.expect(String(data.id_kategori)).to.match(/^[1-9][0-9]*$/);",
+                  "    });",
+                  "    if (/^[1-9][0-9]*$/.test(String(data.id_kategori))) {",
+                  "        pm.collectionVariables.set(\"id_kategori\", String(data.id_kategori));",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "02 — Daftar kategori",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/kategori",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP sesuai\", function () { pm.expect(pm.response.code).to.be.oneOf([200]); });",
+                  "pm.test(\"Respons JSON valid\", function () { pm.response.json(); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "03 — Detail kategori",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/kategori/{{id_kategori}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const requiredIds = [\"id_kategori\"];",
+                  "if (requiredIds.some(key => !/^[1-9][0-9]*$/.test(String(pm.collectionVariables.get(key) || \"\")))) {",
+                  "    console.warn(\"Dilewati: jalankan request CREATE yang sesuai lebih dahulu.\");",
+                  "    pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP sesuai\", function () { pm.expect(pm.response.code).to.be.oneOf([200]); });",
+                  "pm.test(\"Respons JSON valid\", function () { pm.response.json(); });",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "    const body = pm.response.json();",
+                  "    const data = body.data || body;",
+                  "    pm.test(\"Nilai resource sesuai\", function () { pm.expect(data.nama_kategori).to.eql(\"Postman \" + pm.collectionVariables.get(\"run_tag\")); });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "04 — Ubah kategori",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/kategori/{{id_kategori}}",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nama_kategori\": \"Postman Revisi {{run_tag}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const requiredIds = [\"id_kategori\"];",
+                  "if (requiredIds.some(key => !/^[1-9][0-9]*$/.test(String(pm.collectionVariables.get(key) || \"\")))) {",
+                  "    console.warn(\"Dilewati: jalankan request CREATE yang sesuai lebih dahulu.\");",
+                  "    pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP sesuai\", function () { pm.expect(pm.response.code).to.be.oneOf([200]); });",
+                  "pm.test(\"Respons JSON valid\", function () { pm.response.json(); });",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "    const body = pm.response.json();",
+                  "    const data = body.data || body;",
+                  "    pm.test(\"Nilai resource sesuai\", function () { pm.expect(data.nama_kategori).to.eql(\"Postman Revisi \" + pm.collectionVariables.get(\"run_tag\")); });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "05 — Nama kategori duplikat ditolak",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/kategori",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nama_kategori\": \"Postman Revisi {{run_tag}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const requiredIds = [\"id_kategori\"];",
+                  "if (requiredIds.some(key => !/^[1-9][0-9]*$/.test(String(pm.collectionVariables.get(key) || \"\")))) {",
+                  "    console.warn(\"Dilewati: jalankan request CREATE yang sesuai lebih dahulu.\");",
+                  "    pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP sesuai\", function () { pm.expect(pm.response.code).to.be.oneOf([422]); });",
+                  "pm.test(\"Respons JSON valid\", function () { pm.response.json(); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "06 — Nama kategori kosong ditolak",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/kategori",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nama_kategori\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP sesuai\", function () { pm.expect(pm.response.code).to.be.oneOf([422]); });",
+                  "pm.test(\"Respons JSON valid\", function () { pm.response.json(); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "07 — Buat buku uji",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/buku",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_kategori\": {{id_kategori}},\n  \"judul_buku\": \"Buku Uji Postman {{run_tag}}\",\n  \"nama_pengarang\": \"Penguji UTS\",\n  \"penerbit\": \"Pustaka Uji\",\n  \"tahun_terbit\": 2022,\n  \"cetakan\": \"Pertama\",\n  \"tempat_terbit\": \"Banjarmasin\",\n  \"tgl_terima\": \"2026-11-11\",\n  \"asal_buku\": \"Pembelian\",\n  \"jumlah_buku\": 5,\n  \"keterangan\": \"Data pengujian yang dibuat collection; dihapus pada akhir alur.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const requiredIds = [\"id_kategori\"];",
+                  "if (requiredIds.some(key => !/^[1-9][0-9]*$/.test(String(pm.collectionVariables.get(key) || \"\")))) {",
+                  "    console.warn(\"Dilewati: jalankan request CREATE yang sesuai lebih dahulu.\");",
+                  "    pm.execution.skipRequest();",
+                  "}",
+                  "pm.collectionVariables.set(\"id_buku\", \"\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP sesuai\", function () { pm.expect(pm.response.code).to.be.oneOf([201]); });",
+                  "pm.test(\"Respons JSON valid\", function () { pm.response.json(); });",
+                  "if (pm.response.code === 201) {",
+                  "    const body = pm.response.json();",
+                  "    const data = body.data || body;",
+                  "    pm.test(\"ID hasil create tersedia\", function () {",
+                  "        pm.expect(String(data.id_buku)).to.match(/^[1-9][0-9]*$/);",
+                  "    });",
+                  "    if (/^[1-9][0-9]*$/.test(String(data.id_buku))) {",
+                  "        pm.collectionVariables.set(\"id_buku\", String(data.id_buku));",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "08 — Daftar buku",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/buku",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP sesuai\", function () { pm.expect(pm.response.code).to.be.oneOf([200]); });",
+                  "pm.test(\"Respons JSON valid\", function () { pm.response.json(); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "09 — Detail buku",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/buku/{{id_buku}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const requiredIds = [\"id_buku\"];",
+                  "if (requiredIds.some(key => !/^[1-9][0-9]*$/.test(String(pm.collectionVariables.get(key) || \"\")))) {",
+                  "    console.warn(\"Dilewati: jalankan request CREATE yang sesuai lebih dahulu.\");",
+                  "    pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP sesuai\", function () { pm.expect(pm.response.code).to.be.oneOf([200]); });",
+                  "pm.test(\"Respons JSON valid\", function () { pm.response.json(); });",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "    const body = pm.response.json();",
+                  "    const data = body.data || body;",
+                  "    pm.test(\"Nilai resource sesuai\", function () { pm.expect(data.judul_buku).to.eql(\"Buku Uji Postman \" + pm.collectionVariables.get(\"run_tag\")); });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "10 — Ubah buku dan stok",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/buku/{{id_buku}}",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_kategori\": {{id_kategori}},\n  \"judul_buku\": \"Buku Revisi Postman {{run_tag}}\",\n  \"nama_pengarang\": \"Penguji UTS\",\n  \"penerbit\": \"Pustaka Uji\",\n  \"tahun_terbit\": 2022,\n  \"cetakan\": \"Pertama\",\n  \"tempat_terbit\": \"Banjarmasin\",\n  \"tgl_terima\": \"2026-11-11\",\n  \"asal_buku\": \"Pembelian\",\n  \"jumlah_buku\": 8,\n  \"keterangan\": \"Data pengujian yang dibuat collection; dihapus pada akhir alur.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const requiredIds = [\"id_buku\", \"id_kategori\"];",
+                  "if (requiredIds.some(key => !/^[1-9][0-9]*$/.test(String(pm.collectionVariables.get(key) || \"\")))) {",
+                  "    console.warn(\"Dilewati: jalankan request CREATE yang sesuai lebih dahulu.\");",
+                  "    pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP sesuai\", function () { pm.expect(pm.response.code).to.be.oneOf([200]); });",
+                  "pm.test(\"Respons JSON valid\", function () { pm.response.json(); });",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "    const body = pm.response.json();",
+                  "    const data = body.data || body;",
+                  "    pm.test(\"Nilai resource sesuai\", function () { pm.expect(data.jumlah_buku).to.eql(8); });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "11 — Kategori tidak valid ditolak",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/buku",
+            "description": "ID 0 tidak dibuat oleh auto increment normal; request memeriksa validasi kategori.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_kategori\": 0,\n  \"judul_buku\": \"Buku Uji Postman {{run_tag}}\",\n  \"nama_pengarang\": \"Penguji UTS\",\n  \"penerbit\": \"Pustaka Uji\",\n  \"tahun_terbit\": 2022,\n  \"cetakan\": \"Pertama\",\n  \"tempat_terbit\": \"Banjarmasin\",\n  \"tgl_terima\": \"2026-11-11\",\n  \"asal_buku\": \"Pembelian\",\n  \"jumlah_buku\": 5,\n  \"keterangan\": \"Data pengujian yang dibuat collection; dihapus pada akhir alur.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP sesuai\", function () { pm.expect(pm.response.code).to.be.oneOf([422]); });",
+                  "pm.test(\"Respons JSON valid\", function () { pm.response.json(); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "12 — Stok negatif ditolak",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/buku/{{id_buku}}",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_kategori\": {{id_kategori}},\n  \"judul_buku\": \"Buku Revisi Postman {{run_tag}}\",\n  \"nama_pengarang\": \"Penguji UTS\",\n  \"penerbit\": \"Pustaka Uji\",\n  \"tahun_terbit\": 2022,\n  \"cetakan\": \"Pertama\",\n  \"tempat_terbit\": \"Banjarmasin\",\n  \"tgl_terima\": \"2026-11-11\",\n  \"asal_buku\": \"Pembelian\",\n  \"jumlah_buku\": -1,\n  \"keterangan\": \"Data pengujian yang dibuat collection; dihapus pada akhir alur.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const requiredIds = [\"id_buku\", \"id_kategori\"];",
+                  "if (requiredIds.some(key => !/^[1-9][0-9]*$/.test(String(pm.collectionVariables.get(key) || \"\")))) {",
+                  "    console.warn(\"Dilewati: jalankan request CREATE yang sesuai lebih dahulu.\");",
+                  "    pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP sesuai\", function () { pm.expect(pm.response.code).to.be.oneOf([422]); });",
+                  "pm.test(\"Respons JSON valid\", function () { pm.response.json(); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "13 — Kategori yang dipakai tidak bisa dihapus",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/kategori/{{id_kategori}}",
+            "description": "Kategori yang masih digunakan buku menghasilkan 409, tanpa menghapus kategori atau bukunya."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const requiredIds = [\"id_kategori\", \"id_buku\"];",
+                  "if (requiredIds.some(key => !/^[1-9][0-9]*$/.test(String(pm.collectionVariables.get(key) || \"\")))) {",
+                  "    console.warn(\"Dilewati: jalankan request CREATE yang sesuai lebih dahulu.\");",
+                  "    pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP sesuai\", function () { pm.expect(pm.response.code).to.be.oneOf([409]); });",
+                  "pm.test(\"Respons JSON valid\", function () { pm.response.json(); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "14 — Buku tetap ada dan stok tetap 8",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/buku/{{id_buku}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const requiredIds = [\"id_buku\"];",
+                  "if (requiredIds.some(key => !/^[1-9][0-9]*$/.test(String(pm.collectionVariables.get(key) || \"\")))) {",
+                  "    console.warn(\"Dilewati: jalankan request CREATE yang sesuai lebih dahulu.\");",
+                  "    pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP sesuai\", function () { pm.expect(pm.response.code).to.be.oneOf([200]); });",
+                  "pm.test(\"Respons JSON valid\", function () { pm.response.json(); });",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "    const body = pm.response.json();",
+                  "    const data = body.data || body;",
+                  "    pm.test(\"Nilai resource sesuai\", function () { pm.expect(data.jumlah_buku).to.eql(8); });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "15 — Hapus buku uji",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/buku/{{id_buku}}",
+            "description": "Menghapus hanya ID yang direkam dari create dalam alur ini. HTTP 200 atau 204 diterima."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const requiredIds = [\"id_buku\"];",
+                  "if (requiredIds.some(key => !/^[1-9][0-9]*$/.test(String(pm.collectionVariables.get(key) || \"\")))) {",
+                  "    console.warn(\"Dilewati: jalankan request CREATE yang sesuai lebih dahulu.\");",
+                  "    pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP sesuai\", function () { pm.expect(pm.response.code).to.be.oneOf([200, 204]); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "16 — Buku yang sudah dihapus menghasilkan 404",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/buku/{{id_buku}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const requiredIds = [\"id_buku\"];",
+                  "if (requiredIds.some(key => !/^[1-9][0-9]*$/.test(String(pm.collectionVariables.get(key) || \"\")))) {",
+                  "    console.warn(\"Dilewati: jalankan request CREATE yang sesuai lebih dahulu.\");",
+                  "    pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP sesuai\", function () { pm.expect(pm.response.code).to.be.oneOf([404]); });",
+                  "pm.test(\"Respons JSON valid\", function () { pm.response.json(); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "17 — Hapus kategori uji setelah bukunya dihapus",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/kategori/{{id_kategori}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const requiredIds = [\"id_kategori\"];",
+                  "if (requiredIds.some(key => !/^[1-9][0-9]*$/.test(String(pm.collectionVariables.get(key) || \"\")))) {",
+                  "    console.warn(\"Dilewati: jalankan request CREATE yang sesuai lebih dahulu.\");",
+                  "    pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP sesuai\", function () { pm.expect(pm.response.code).to.be.oneOf([200, 204]); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "18 — Kategori yang sudah dihapus menghasilkan 404",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/kategori/{{id_kategori}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const requiredIds = [\"id_kategori\"];",
+                  "if (requiredIds.some(key => !/^[1-9][0-9]*$/.test(String(pm.collectionVariables.get(key) || \"\")))) {",
+                  "    console.warn(\"Dilewati: jalankan request CREATE yang sesuai lebih dahulu.\");",
+                  "    pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP sesuai\", function () { pm.expect(pm.response.code).to.be.oneOf([404]); });",
+                  "pm.test(\"Respons JSON valid\", function () { pm.response.json(); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    }
+  ]
+}
